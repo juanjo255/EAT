@@ -1,6 +1,9 @@
-# Update
-Due to ongoing internal server issues all data has been transferred to Zenodo: https://zenodo.org/records/14675997
-In case any of the links below is broken, please retrieve the files from the Zenodo repository.
+# Changes in this fork
+
+- **FASTA queries vs. pre-computed H5 lookup (`eat.py`)**: embeddings computed on the fly from a FASTA file come out of ProtT5 in half precision (float16), while embeddings read from an H5 file are cast to float32. Mixing both (e.g. `-l sprot.h5 -q queries.fasta`) crashed `torch.cdist` with `RuntimeError: expected scalar type Half but found Float`. FASTA-derived embeddings are now cast to float32 when returned (`read_inputs()`); the H5 file written to the output folder is unchanged.
+- **`annotate_eat_results.py`**: fills the `Lookup-Label` column of `eat_result.txt` with UniProt annotations (see [Annotating hits from the SwissProt lookup](#annotating-hits-from-the-swissprot-lookup)).
+- **Updated SwissProt lookup**: the 2021 SwissProt embeddings were replaced by the current UniProt release (see [Updated SwissProt embeddings from UniProt](#updated-swissprot-embeddings-from-uniprot)).
+- **`.gitignore`**: local backups (`*.bak*`), the HuggingFace cache (`hf_cache/`), and large embedding/weight files (`data/lookup_dbs/`, `*.h5`, `tucker_weights.pt`) are not tracked.
 
 # EAT
 
@@ -75,6 +78,23 @@ Proteins longer than 9.1k residues had to be excluded due to OOM-errors (only a 
 The embeddings can readily be used as input to the lookup file parameter of EAT.
 IF you want to detect structural homologs, we recommend running the provided lookup embeddings through ProtTucker(ProtT5) first. This can be done by adding the flag `--use_tucker 1`.
 
+## Updated SwissProt embeddings from UniProt
+
+UniProt distributes per-protein ProtT5 embeddings for UniProtKB/Swiss-Prot with every release (https://www.uniprot.org/help/downloads#embeddings).
+They are generated with the same model (ProtT5-XL-U50, mean-pooled 1024-d, half precision) and keyed by UniProt accession, so they are a drop-in replacement for `sprot_161121.h5`.
+Proteins longer than 12k residues are excluded by UniProt.
+
+```sh
+mkdir -p data/lookup_dbs
+wget -c https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/embeddings/uniprot_sprot/per-protein.h5 \
+     -O data/lookup_dbs/sprot_2026_09.h5
+python eat.py -l data/lookup_dbs/sprot_2026_09.h5 -q queries.fasta -o eat_results/ --num_NN 2
+```
+
+Version used here: UniProt release of 2026-09-03 (`sprot_2026_09.h5`, 575,736 proteins, 1.3 GB), compared with 565,232 proteins in `sprot_161121.h5`.
+Nearest neighbors can differ from the 2021 DB because of the newer entries, but distances are on the same scale, so thresholds (e.g. `--threshold 1.1`) keep their meaning.
+`data/lookup_dbs/` is git-ignored; download the file after cloning.
+
 ## Annotating hits from the SwissProt lookup
 
 The SwissProt embeddings only store accessions, so without `--lookupLabels` the `Lookup-Label` column of `eat_result.txt` is `None`.
@@ -86,7 +106,7 @@ python annotate_eat_results.py -i eat_results/eat_result.txt
 python annotate_eat_results.py -i eat_results/eat_result.txt -o annotated.tsv --fields protein_name,organism_name,gene_names,ec
 ```
 
-Accessions that became secondary since the 2021 DB snapshot are resolved to their current entries (listed in `Current-Accession`); IDs not found in UniProt are written as `NA`.
+Accessions that became secondary since the lookup DB was built (relevant for the 2021 snapshot) are resolved to their current entries (listed in `Current-Accession`); IDs not found in UniProt are written as `NA`.
 
 # Train your own network
 
