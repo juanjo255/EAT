@@ -174,7 +174,7 @@ class Embedder():
             
             
             n_res_batch = sum([ s_len for  _, _, s_len in batch ]) + seq_len 
-            if len(batch) >= max_batch or n_res_batch>=max_residues or seq_idx==len(id2seq) or seq_len>max_seq_len:
+            if len(batch) >= max_batch or n_res_batch>=max_residues or seq_idx==len(id2seq)-1 or seq_len>max_seq_len:
                 protein_ids, seqs, seq_lens = zip(*batch)
                 batch = list()
                 
@@ -266,7 +266,7 @@ class EAT():
             
             emb_p  = self.output_d / input_p.name.replace(".fasta", ".h5")
             self.Embedder.write_embedding_list(emb_p, ids,embeddings)
-            return ids, embeddings
+            return ids, embeddings.float()
         else:
             print("The file you passed neither ended with .fasta nor .h5. " +
                   "Only those file formats are currently supported.")

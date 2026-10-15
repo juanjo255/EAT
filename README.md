@@ -75,6 +75,19 @@ Proteins longer than 9.1k residues had to be excluded due to OOM-errors (only a 
 The embeddings can readily be used as input to the lookup file parameter of EAT.
 IF you want to detect structural homologs, we recommend running the provided lookup embeddings through ProtTucker(ProtT5) first. This can be done by adding the flag `--use_tucker 1`.
 
+## Annotating hits from the SwissProt lookup
+
+The SwissProt embeddings only store accessions, so without `--lookupLabels` the `Lookup-Label` column of `eat_result.txt` is `None`.
+`annotate_eat_results.py` fills it post hoc from the UniProt REST API (protein name by default) and appends organism and gene names, without re-running EAT:
+
+```sh
+python annotate_eat_results.py -i eat_results/eat_result.txt
+# -> eat_results/eat_result_annotated.tsv
+python annotate_eat_results.py -i eat_results/eat_result.txt -o annotated.tsv --fields protein_name,organism_name,gene_names,ec
+```
+
+Accessions that became secondary since the 2021 DB snapshot are resolved to their current entries (listed in `Current-Accession`); IDs not found in UniProt are written as `NA`.
+
 # Train your own network
 
 The following steps will allow you to replicate the training of ProtTucker:
